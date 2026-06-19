@@ -7,7 +7,10 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { createIcons, Eye, Map, RefreshCw } from "lucide";
+import authoredMapUrl from "./assets/moba_quality_chunk.glb?url";
 
 const canvas = document.querySelector("#scene");
 const renderer = new THREE.WebGLRenderer({
@@ -69,6 +72,8 @@ const state = {
   waterShaders: [],
   foliageShaders: [],
   objectiveShaders: [],
+  assetLoaded: false,
+  authoredMeshCount: 0,
   mapRoot: new THREE.Group(),
 };
 
@@ -118,6 +123,8 @@ const GameArtGradeShader = {
 
 const gameArtGradePass = new ShaderPass(GameArtGradeShader);
 composer.addPass(gameArtGradePass);
+const fxaaPass = new ShaderPass(FXAAShader);
+composer.addPass(fxaaPass);
 composer.addPass(new OutputPass());
 
 window.__MOBA_DEBUG__ = () => ({
@@ -130,6 +137,8 @@ window.__MOBA_DEBUG__ = () => ({
   detail: state.detail,
   qualityProfile: state.qualityProfile,
   pixelRatio: renderPixelRatio,
+  assetLoaded: state.assetLoaded,
+  authoredMeshCount: state.authoredMeshCount,
 });
 
 const tmpColor = new THREE.Color();
@@ -3593,8 +3602,8 @@ function productionTerrainInfo(x, z) {
 function productionTerrainColor(x, z, info) {
   const grassShadow = new THREE.Color(0x2d4930);
   const grassLight = new THREE.Color(0x759755);
-  const laneDark = new THREE.Color(0x6d5535);
-  const laneLight = new THREE.Color(0xd0b877);
+  const laneDark = new THREE.Color(0x64492b);
+  const laneLight = new THREE.Color(0xbfa66a);
   const riverBed = new THREE.Color(0x27666a);
   const riverLight = new THREE.Color(0x5cae9b);
   const cliff = new THREE.Color(0x5d6756);
@@ -3602,7 +3611,7 @@ function productionTerrainColor(x, z, info) {
   const objective = new THREE.Color(0x78806a);
   const color = grassShadow.clone().lerp(grassLight, smoothstep(0.1, 0.82, info.noise));
   color.lerp(moss, info.jungleMask * 0.5);
-  color.lerp(laneDark.clone().lerp(laneLight, 0.25 + info.noise * 0.35), info.laneMask * 0.92);
+  color.lerp(laneDark.clone().lerp(laneLight, 0.2 + info.noise * 0.28), info.laneMask * 0.86);
   color.lerp(riverBed.clone().lerp(riverLight, 0.28), info.riverMask * 0.84);
   color.lerp(new THREE.Color(0x90b178), info.riverBankMask * 0.16);
   color.lerp(objective, info.objectiveMask * 0.38);
@@ -3645,8 +3654,8 @@ function createProductionTerrainTexture() {
   });
 
   context.globalCompositeOperation = "screen";
-  drawProductionPath(context, productionLane, width, height, 2.1, "rgba(255, 226, 142, 1)", 0.14);
-  drawProductionPath(context, productionLane, width, height, 0.32, "rgba(255, 245, 191, 1)", 0.28);
+  drawProductionPath(context, productionLane, width, height, 1.7, "rgba(255, 226, 142, 1)", 0.1);
+  drawProductionPath(context, productionLane, width, height, 0.24, "rgba(255, 245, 191, 1)", 0.18);
   drawProductionPath(context, productionRiver, width, height, 0.52, "rgba(151, 255, 222, 1)", 0.2);
   drawProductionRing(context, 3.2, -0.4, 4.6, width, height, "rgba(134, 255, 214, 1)", 0.34, 0.2);
   drawProductionRing(context, -12.6, -1.4, 2.6, width, height, "rgba(190, 240, 142, 1)", 0.18, 0.14);
@@ -3844,7 +3853,7 @@ function createProductionTerrain() {
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.04, 0.32, 0.34), waterInset * 0.16);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.33, 0.38, 0.31), cliffFace * 0.14);
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.14, 0.27, 0.14), foliagePocket * 0.1);
-        diffuseColor.rgb += vec3(0.05, 0.042, 0.018) * laneWear;
+        diffuseColor.rgb += vec3(0.036, 0.03, 0.014) * laneWear;
         diffuseColor.rgb = max(diffuseColor.rgb, vec3(0.065, 0.09, 0.06));
       `,
       );
@@ -4201,6 +4210,263 @@ function addProductionTerrainPaintAccents(group) {
   });
 }
 
+function createProductionIrregularSlabGeometry() {
+  const outline = [
+    [-0.58, -0.18],
+    [-0.38, -0.42],
+    [0.2, -0.46],
+    [0.56, -0.24],
+    [0.62, 0.08],
+    [0.34, 0.38],
+    [-0.22, 0.44],
+    [-0.62, 0.2],
+  ];
+  const halfHeight = 0.055;
+  const vertices = [];
+
+  function push(x, y, z) {
+    vertices.push(x, y, z);
+  }
+
+  for (let i = 1; i < outline.length - 1; i += 1) {
+    push(outline[0][0], halfHeight, outline[0][1]);
+    push(outline[i][0], halfHeight, outline[i][1]);
+    push(outline[i + 1][0], halfHeight, outline[i + 1][1]);
+  }
+  for (let i = outline.length - 2; i > 0; i -= 1) {
+    push(outline[0][0], -halfHeight, outline[0][1]);
+    push(outline[i + 1][0], -halfHeight, outline[i + 1][1]);
+    push(outline[i][0], -halfHeight, outline[i][1]);
+  }
+  for (let i = 0; i < outline.length; i += 1) {
+    const next = (i + 1) % outline.length;
+    const a = outline[i];
+    const b = outline[next];
+    push(a[0], halfHeight, a[1]);
+    push(a[0], -halfHeight, a[1]);
+    push(b[0], halfHeight, b[1]);
+    push(b[0], halfHeight, b[1]);
+    push(a[0], -halfHeight, a[1]);
+    push(b[0], -halfHeight, b[1]);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function addProductionLaneSlabClusters(group) {
+  const localRng = mulberry32(181221);
+  const slabGeometry = createProductionIrregularSlabGeometry();
+  const slabMaterial = createPaintedStoneMaterial(0x82775d, 0xd4c083, 0x11120d, 0.026);
+  const slabCount = 46;
+  const slabs = new THREE.InstancedMesh(slabGeometry, slabMaterial, slabCount);
+  slabs.name = "ProductionStyleTargetLaneEmbeddedSlabs";
+  slabs.castShadow = true;
+  slabs.receiveShadow = true;
+
+  const shadowGeometry = new THREE.CircleGeometry(1, 28);
+  const shadowMaterial = new THREE.MeshBasicMaterial({
+    color: 0x071009,
+    transparent: true,
+    opacity: 0.075,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const shadows = new THREE.InstancedMesh(shadowGeometry, shadowMaterial, slabCount);
+  shadows.name = "ProductionStyleTargetLaneSlabShadows";
+
+  for (let i = 0; i < slabCount; i += 1) {
+    const p = pathPoint(productionLane, (i + 0.5 + localRng() * 0.34) / slabCount);
+    const nx = -Math.sin(p.angle);
+    const nz = Math.cos(p.angle);
+    const side = (localRng() - 0.5) * (i % 5 === 0 ? 3.0 : 2.15);
+    const x = p.x + nx * side + (localRng() - 0.5) * 0.42;
+    const z = p.z + nz * side + (localRng() - 0.5) * 0.42;
+    const info = productionTerrainInfo(x, z);
+    const slabLength = 0.78 + localRng() * 1.8;
+    const slabWidth = 0.44 + localRng() * 0.76;
+    tmpVector.set(x, info.height + 0.13, z);
+    tmpQuat.setFromEuler(new THREE.Euler((localRng() - 0.5) * 0.035, -p.angle + (localRng() - 0.5) * 0.72, (localRng() - 0.5) * 0.035));
+    tmpScale.set(slabLength, 0.82 + localRng() * 0.34, slabWidth);
+    slabs.setMatrixAt(i, matrix.compose(tmpVector, tmpQuat, tmpScale));
+    tmpColor.setHex(i % 3 === 0 ? 0x948565 : i % 3 === 1 ? 0x746d59 : 0xa08d68);
+    tmpColor.offsetHSL((localRng() - 0.5) * 0.018, (localRng() - 0.5) * 0.07, (localRng() - 0.5) * 0.09);
+    slabs.setColorAt(i, tmpColor);
+
+    tmpVector.set(x + nx * 0.08, info.height + 0.072, z + nz * 0.08);
+    tmpQuat.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, -p.angle + (localRng() - 0.5) * 0.5));
+    tmpScale.set(slabLength * 1.25, slabWidth * 1.15, 1);
+    shadows.setMatrixAt(i, matrix.compose(tmpVector, tmpQuat, tmpScale));
+  }
+  slabs.instanceMatrix.needsUpdate = true;
+  slabs.instanceColor.needsUpdate = true;
+  shadows.instanceMatrix.needsUpdate = true;
+  group.add(shadows);
+  group.add(slabs);
+}
+
+function addProductionLaneShoulderBreakup(group) {
+  const localRng = mulberry32(181922);
+  const geometry = new THREE.CircleGeometry(1, 24);
+  const mossMaterial = new THREE.MeshBasicMaterial({
+    color: 0x3c642f,
+    transparent: true,
+    opacity: 0.095,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const dirtMaterial = new THREE.MeshBasicMaterial({
+    color: 0x0a1209,
+    transparent: true,
+    opacity: 0.075,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const moss = new THREE.InstancedMesh(geometry, mossMaterial, 96);
+  const dirt = new THREE.InstancedMesh(geometry, dirtMaterial, 78);
+  moss.name = "ProductionStyleTargetLaneShoulderBreakup";
+  dirt.name = "ProductionStyleTargetLaneShoulderBreakup";
+
+  for (let i = 0; i < moss.count; i += 1) {
+    const p = pathPoint(productionLane, (i + localRng() * 0.85) / moss.count);
+    const side = localRng() > 0.5 ? 1 : -1;
+    const nx = -Math.sin(p.angle);
+    const nz = Math.cos(p.angle);
+    const x = p.x + nx * side * (2.1 + localRng() * 2.1) + (localRng() - 0.5) * 0.35;
+    const z = p.z + nz * side * (2.1 + localRng() * 2.1) + (localRng() - 0.5) * 0.35;
+    const info = productionTerrainInfo(x, z);
+    tmpVector.set(x, info.height + 0.105, z);
+    tmpQuat.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, -p.angle + (localRng() - 0.5) * 0.72));
+    tmpScale.set(0.9 + localRng() * 2.4, 0.18 + localRng() * 0.52, 1);
+    moss.setMatrixAt(i, matrix.compose(tmpVector, tmpQuat, tmpScale));
+  }
+
+  for (let i = 0; i < dirt.count; i += 1) {
+    const p = pathPoint(productionLane, (i + localRng() * 0.9) / dirt.count);
+    const side = localRng() > 0.5 ? 1 : -1;
+    const nx = -Math.sin(p.angle);
+    const nz = Math.cos(p.angle);
+    const x = p.x + nx * side * (2.75 + localRng() * 2.45) + (localRng() - 0.5) * 0.45;
+    const z = p.z + nz * side * (2.75 + localRng() * 2.45) + (localRng() - 0.5) * 0.45;
+    const info = productionTerrainInfo(x, z);
+    tmpVector.set(x, info.height + 0.098, z);
+    tmpQuat.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, -p.angle + (localRng() - 0.5) * 0.8));
+    tmpScale.set(1.25 + localRng() * 2.9, 0.16 + localRng() * 0.48, 1);
+    dirt.setMatrixAt(i, matrix.compose(tmpVector, tmpQuat, tmpScale));
+  }
+  moss.instanceMatrix.needsUpdate = true;
+  dirt.instanceMatrix.needsUpdate = true;
+  group.add(dirt);
+  group.add(moss);
+}
+
+function addProductionWaterDetails(group) {
+  const localRng = mulberry32(731090);
+  const padGeometry = new THREE.CircleGeometry(1, 18);
+  const padMaterial = new THREE.MeshStandardMaterial({
+    color: 0x4e7f45,
+    roughness: 0.88,
+    metalness: 0,
+    flatShading: true,
+    emissive: 0x0d1b0e,
+    emissiveIntensity: 0.035,
+  });
+  const padCount = 30;
+  const pads = new THREE.InstancedMesh(padGeometry, padMaterial, padCount);
+  pads.name = "ProductionStyleTargetWaterLilyPads";
+  pads.receiveShadow = true;
+
+  const rippleGeometry = new THREE.RingGeometry(0.76, 0.82, 42);
+  const rippleMaterial = new THREE.MeshBasicMaterial({
+    color: 0xb7f3d8,
+    transparent: true,
+    opacity: 0.13,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const rippleCount = 34;
+  const ripples = new THREE.InstancedMesh(rippleGeometry, rippleMaterial, rippleCount);
+  ripples.name = "ProductionStyleTargetWaterDetailRipples";
+
+  for (let i = 0; i < padCount; i += 1) {
+    const p = pathPoint(productionRiver, (i + localRng() * 0.8) / padCount);
+    const nx = -Math.sin(p.angle);
+    const nz = Math.cos(p.angle);
+    const side = localRng() > 0.5 ? 1 : -1;
+    const x = p.x + nx * side * (0.72 + localRng() * 0.9) + (localRng() - 0.5) * 0.28;
+    const z = p.z + nz * side * (0.72 + localRng() * 0.9) + (localRng() - 0.5) * 0.28;
+    const info = productionTerrainInfo(x, z);
+    tmpVector.set(x, info.height + 0.145, z);
+    tmpQuat.setFromEuler(new THREE.Euler(-Math.PI / 2 + (localRng() - 0.5) * 0.035, 0, localRng() * Math.PI * 2));
+    const s = 0.18 + localRng() * 0.34;
+    tmpScale.set(s * (1.0 + localRng() * 0.7), s * (0.62 + localRng() * 0.34), 1);
+    pads.setMatrixAt(i, matrix.compose(tmpVector, tmpQuat, tmpScale));
+    tmpColor.setHex(localRng() > 0.45 ? 0x4e7f45 : 0x6b9549).offsetHSL((localRng() - 0.5) * 0.02, (localRng() - 0.5) * 0.09, (localRng() - 0.5) * 0.08);
+    pads.setColorAt(i, tmpColor);
+  }
+
+  for (let i = 0; i < rippleCount; i += 1) {
+    const p = pathPoint(productionRiver, (i + localRng() * 0.82) / rippleCount);
+    const nx = -Math.sin(p.angle);
+    const nz = Math.cos(p.angle);
+    const side = localRng() > 0.5 ? 1 : -1;
+    const x = p.x + nx * side * (0.52 + localRng() * 1.1);
+    const z = p.z + nz * side * (0.52 + localRng() * 1.1);
+    const info = productionTerrainInfo(x, z);
+    tmpVector.set(x, info.height + 0.162, z);
+    tmpQuat.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, -p.angle + (localRng() - 0.5) * 0.8));
+    const s = 0.42 + localRng() * 0.72;
+    tmpScale.set(s * (1.1 + localRng() * 0.8), s * (0.42 + localRng() * 0.34), 1);
+    ripples.setMatrixAt(i, matrix.compose(tmpVector, tmpQuat, tmpScale));
+  }
+  pads.instanceMatrix.needsUpdate = true;
+  pads.instanceColor.needsUpdate = true;
+  ripples.instanceMatrix.needsUpdate = true;
+  group.add(pads);
+  group.add(ripples);
+}
+
+function addProductionCanopyMassShadows(group) {
+  const localRng = mulberry32(772201);
+  const geometry = new THREE.CircleGeometry(1, 36);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x050d07,
+    transparent: true,
+    opacity: 0.11,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const specs = [
+    [-18.6, 10.0, 5.2, 2.0, -0.18],
+    [-3.6, 10.2, 6.4, 2.1, 0.08],
+    [16.6, 9.2, 5.9, 2.1, 0.18],
+    [-18.2, -13.0, 5.4, 2.0, 0.1],
+    [2.6, -12.2, 6.4, 2.0, -0.04],
+    [17.6, -9.4, 5.4, 2.0, -0.16],
+    [-13.2, -1.2, 3.2, 1.5, 0.22],
+    [11.8, 5.0, 3.2, 1.5, -0.18],
+  ];
+  const shadows = new THREE.InstancedMesh(geometry, material, specs.length * 3);
+  shadows.name = "ProductionStyleTargetCanopyMassShadow";
+  let index = 0;
+  specs.forEach(([cx, cz, rx, rz, rotation]) => {
+    for (let i = 0; i < 3; i += 1) {
+      const x = cx + (localRng() - 0.5) * rx * 0.38;
+      const z = cz + (localRng() - 0.5) * rz * 0.4;
+      const info = productionTerrainInfo(x, z);
+      tmpVector.set(x, info.height + 0.066 + i * 0.004, z);
+      tmpQuat.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, rotation + (localRng() - 0.5) * 0.45));
+      tmpScale.set(rx * (0.48 + localRng() * 0.28), rz * (0.46 + localRng() * 0.28), 1);
+      shadows.setMatrixAt(index, matrix.compose(tmpVector, tmpQuat, tmpScale));
+      index += 1;
+    }
+  });
+  shadows.instanceMatrix.needsUpdate = true;
+  group.add(shadows);
+}
+
 function addProductionCliffRimGrass(points, count, group, sideBias = 1, seed = 1) {
   const localRng = mulberry32(8600 + seed * 37);
   const geometry = createBrushBladeGeometry();
@@ -4326,12 +4592,12 @@ function addProductionCanopyBrushCards(group) {
     map: createProductionLeafBrushTexture(),
     alphaTest: 0.12,
     transparent: true,
-    opacity: 0.58,
+    opacity: 0.42,
     depthWrite: false,
     side: THREE.DoubleSide,
     vertexColors: true,
   });
-  const cards = new THREE.InstancedMesh(geometry, material, 360);
+  const cards = new THREE.InstancedMesh(geometry, material, 220);
   cards.name = "ProductionStyleTargetCanopyBrushCards";
   const standSpecs = [
     [-18.6, 10.0, 4.8, 1.9, 2.2],
@@ -4341,7 +4607,7 @@ function addProductionCanopyBrushCards(group) {
     [2.6, -12.2, 6.0, 2.0, 2.35],
     [17.6, -9.4, 5.0, 2.1, 2.12],
   ];
-  for (let i = 0; i < 360; i += 1) {
+  for (let i = 0; i < cards.count; i += 1) {
     const zone = standSpecs[i % standSpecs.length];
     const angle = localRng() * Math.PI * 2;
     const radius = Math.sqrt(localRng());
@@ -4360,6 +4626,239 @@ function addProductionCanopyBrushCards(group) {
   cards.instanceMatrix.needsUpdate = true;
   cards.instanceColor.needsUpdate = true;
   group.add(cards);
+}
+
+function createProductionSculptedCanopyPlateGeometry() {
+  const ringCount = 18;
+  const top = [];
+  const lower = [];
+  const vertices = [];
+
+  for (let i = 0; i < ringCount; i += 1) {
+    const t = (i / ringCount) * Math.PI * 2;
+    const notch = 1 + Math.sin(t * 3.0 + 0.5) * 0.06 + Math.sin(t * 7.0 - 0.3) * 0.035;
+    const x = Math.cos(t) * notch;
+    const z = Math.sin(t) * (0.58 + Math.cos(t * 2.0) * 0.035) * notch;
+    const rimY = 0.02 + Math.sin(t * 4.0) * 0.018;
+    top.push([x, rimY, z]);
+    lower.push([x * 1.02, -0.18 + Math.sin(t * 2.0) * 0.018, z * 1.02]);
+  }
+
+  function push(point) {
+    vertices.push(point[0], point[1], point[2]);
+  }
+
+  const center = [0, 0.23, 0];
+  for (let i = 0; i < ringCount; i += 1) {
+    const next = (i + 1) % ringCount;
+    push(center);
+    push(top[i]);
+    push(top[next]);
+  }
+
+  const underside = [0, -0.16, 0];
+  for (let i = ringCount - 1; i >= 0; i -= 1) {
+    const next = (i - 1 + ringCount) % ringCount;
+    push(underside);
+    push(lower[i]);
+    push(lower[next]);
+  }
+
+  for (let i = 0; i < ringCount; i += 1) {
+    const next = (i + 1) % ringCount;
+    push(top[i]);
+    push(lower[i]);
+    push(top[next]);
+    push(top[next]);
+    push(lower[i]);
+    push(lower[next]);
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function createProductionSculptedCanopyMaterial() {
+  const material = new THREE.MeshStandardMaterial({
+    color: 0x5f9348,
+    roughness: 0.94,
+    metalness: 0,
+    flatShading: false,
+    vertexColors: true,
+    emissive: 0x0d1b0d,
+    emissiveIntensity: 0.05,
+  });
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `
+        #include <common>
+        varying vec3 vPlateLocalPosition;
+        varying vec3 vPlateWorldNormal;
+      `,
+      )
+      .replace(
+        "#include <begin_vertex>",
+        `
+        #include <begin_vertex>
+        vPlateLocalPosition = position;
+        vPlateWorldNormal = normalize(mat3(modelMatrix) * objectNormal);
+      `,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `
+        #include <common>
+        varying vec3 vPlateLocalPosition;
+        varying vec3 vPlateWorldNormal;
+        float plateHash(vec3 p) {
+          return fract(sin(dot(p, vec3(21.7, 61.3, 111.1))) * 34821.13);
+        }
+      `,
+      )
+      .replace(
+        "#include <color_fragment>",
+        `
+        #include <color_fragment>
+        float top = smoothstep(-0.08, 0.22, vPlateLocalPosition.y);
+        float edge = smoothstep(0.62, 1.02, length(vPlateLocalPosition.xz));
+        float facing = clamp(dot(normalize(vPlateWorldNormal), normalize(vec3(-0.42, 0.86, 0.32))) * 0.5 + 0.5, 0.0, 1.0);
+        float grain = plateHash(floor(vPlateLocalPosition * 9.0));
+        diffuseColor.rgb *= 0.56 + top * 0.24 + facing * 0.2 + grain * 0.055;
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.07, 0.17, 0.07), (1.0 - top) * 0.42 + edge * 0.1);
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.68, 0.82, 0.36), top * facing * 0.14);
+        diffuseColor.rgb = max(diffuseColor.rgb, vec3(0.065, 0.115, 0.055));
+      `,
+      );
+  };
+  return material;
+}
+
+function addProductionSculptedCanopyPlates(group) {
+  const localRng = mulberry32(410991);
+  const plateGeometry = createProductionSculptedCanopyPlateGeometry();
+  const plateMaterial = createProductionSculptedCanopyMaterial();
+  const shadowMaterial = new THREE.MeshBasicMaterial({
+    color: 0x071009,
+    transparent: true,
+    opacity: 0.16,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const clusterSpecs = [
+    [-18.6, 10.0, 4.8, 1.9, 0.04],
+    [-3.6, 10.2, 6.1, 2.1, -0.08],
+    [16.6, 9.2, 5.6, 2.1, 0.1],
+    [-18.2, -13.0, 5.0, 2.1, 0.18],
+    [2.6, -12.2, 6.0, 2.0, -0.12],
+    [17.6, -9.4, 5.0, 2.1, 0.08],
+  ];
+  const platesPerCluster = 16;
+  const plateCount = clusterSpecs.length * platesPerCluster;
+  const plates = new THREE.InstancedMesh(plateGeometry, plateMaterial, plateCount);
+  const underShadows = new THREE.InstancedMesh(new THREE.CircleGeometry(1, 32), shadowMaterial, clusterSpecs.length * 5);
+  plates.name = "ProductionStyleTargetSculptedCanopyPlates";
+  underShadows.name = "ProductionStyleTargetSculptedCanopyPlateShadows";
+  plates.castShadow = true;
+  plates.receiveShadow = true;
+
+  const trunkGeometry = new THREE.CylinderGeometry(0.16, 0.34, 1, 9, 4);
+  const branchGeometry = new THREE.CylinderGeometry(0.055, 0.14, 1, 7, 3);
+  const barkMaterial = createPaintedBarkMaterial();
+  const trunks = new THREE.InstancedMesh(trunkGeometry, barkMaterial, clusterSpecs.length * 3);
+  const branches = new THREE.InstancedMesh(branchGeometry, barkMaterial, clusterSpecs.length * 7);
+  trunks.name = "ProductionStyleTargetSculptedCanopyTrunks";
+  branches.name = "ProductionStyleTargetSculptedCanopyBranches";
+  trunks.castShadow = true;
+  branches.castShadow = true;
+  trunks.receiveShadow = true;
+  branches.receiveShadow = true;
+
+  let plateIndex = 0;
+  let shadowIndex = 0;
+  let trunkIndex = 0;
+  let branchIndex = 0;
+  clusterSpecs.forEach(([cx, cz, rx, rz, rotation], clusterIndex) => {
+    const clusterRng = mulberry32(411500 + clusterIndex * 29);
+    const branchAnchors = [];
+    for (let i = 0; i < platesPerCluster; i += 1) {
+      const tier = i / (platesPerCluster - 1);
+      const radial = Math.sqrt(clusterRng());
+      const angle = clusterRng() * Math.PI * 2;
+      const localX = Math.cos(angle) * radial * rx * (0.58 + tier * 0.18);
+      const localZ = Math.sin(angle) * radial * rz * (0.62 + tier * 0.18);
+      const x = cx + localX;
+      const z = cz + localZ;
+      const info = productionTerrainInfo(x, z);
+      const height = info.height + 1.18 + tier * 1.2 + clusterRng() * 0.46;
+      tmpVector.set(x, height, z);
+      tmpQuat.setFromEuler(new THREE.Euler(-0.08 + (clusterRng() - 0.5) * 0.18, rotation + clusterRng() * Math.PI * 2, (clusterRng() - 0.5) * 0.12));
+      const scale = 1.15 + clusterRng() * 1.25 + tier * 0.32;
+      tmpScale.set(scale * (1.36 + clusterRng() * 0.72), scale * (0.78 + clusterRng() * 0.32), scale * (0.62 + clusterRng() * 0.38));
+      plates.setMatrixAt(plateIndex, matrix.compose(tmpVector, tmpQuat, tmpScale));
+      tmpColor.setHSL(0.25 + (clusterRng() - 0.5) * 0.028, 0.34 + clusterRng() * 0.14, 0.36 + tier * 0.17 + clusterRng() * 0.06);
+      plates.setColorAt(plateIndex, tmpColor);
+      plateIndex += 1;
+    }
+
+    for (let i = 0; i < 3; i += 1) {
+      const angle = rotation + (i / 3) * Math.PI * 2 + (clusterRng() - 0.5) * 0.55;
+      const radius = 0.15 + clusterRng() * 0.46;
+      const x = cx + Math.cos(angle) * radius * rx * 0.35;
+      const z = cz + Math.sin(angle) * radius * rz * 0.4;
+      const info = productionTerrainInfo(x, z);
+      const height = 1.2 + clusterRng() * 0.92;
+      const lean = new THREE.Vector3((clusterRng() - 0.5) * 0.24, 1, (clusterRng() - 0.5) * 0.24).normalize();
+      tmpVector.set(x + lean.x * height * 0.16, info.height + height * 0.5, z + lean.z * height * 0.16);
+      tmpQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), lean);
+      tmpScale.set(0.84 + clusterRng() * 0.26, height, 0.84 + clusterRng() * 0.26);
+      trunks.setMatrixAt(trunkIndex, matrix.compose(tmpVector, tmpQuat, tmpScale));
+      branchAnchors.push({
+        x: x + lean.x * height * 0.36,
+        y: info.height + height * 0.86,
+        z: z + lean.z * height * 0.36,
+        angle,
+      });
+      trunkIndex += 1;
+    }
+
+    for (let i = 0; i < 7; i += 1) {
+      const anchor = branchAnchors[i % branchAnchors.length];
+      const spread = anchor.angle + (clusterRng() - 0.5) * 1.9;
+      const length = 0.82 + clusterRng() * 1.1;
+      const dir = new THREE.Vector3(Math.cos(spread) * 0.74, 0.35 + clusterRng() * 0.22, Math.sin(spread) * 0.74).normalize();
+      tmpVector.set(anchor.x + dir.x * length * 0.5, anchor.y + dir.y * length * 0.5, anchor.z + dir.z * length * 0.5);
+      tmpQuat.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      tmpScale.set(0.7 + clusterRng() * 0.34, length, 0.7 + clusterRng() * 0.34);
+      branches.setMatrixAt(branchIndex, matrix.compose(tmpVector, tmpQuat, tmpScale));
+      branchIndex += 1;
+    }
+
+    for (let i = 0; i < 5; i += 1) {
+      const x = cx + (localRng() - 0.5) * rx * 0.62;
+      const z = cz + (localRng() - 0.5) * rz * 0.62;
+      const info = productionTerrainInfo(x, z);
+      tmpVector.set(x, info.height + 0.071, z);
+      tmpQuat.setFromEuler(new THREE.Euler(-Math.PI / 2, 0, rotation + (localRng() - 0.5) * 0.42));
+      tmpScale.set(rx * (0.42 + localRng() * 0.28), rz * (0.48 + localRng() * 0.26), 1);
+      underShadows.setMatrixAt(shadowIndex, matrix.compose(tmpVector, tmpQuat, tmpScale));
+      shadowIndex += 1;
+    }
+  });
+
+  plates.instanceMatrix.needsUpdate = true;
+  plates.instanceColor.needsUpdate = true;
+  underShadows.instanceMatrix.needsUpdate = true;
+  trunks.instanceMatrix.needsUpdate = true;
+  branches.instanceMatrix.needsUpdate = true;
+  group.add(underShadows);
+  group.add(trunks);
+  group.add(branches);
+  group.add(plates);
 }
 
 function addProductionCliffFacePaint(points, count, group, sideBias = 1, seed = 1) {
@@ -4743,6 +5242,7 @@ function addProductionStyleTarget(root) {
   addProductionPaintedLighting(target);
   addProductionBakedOcclusion(target);
   addProductionTerrainPaintAccents(target);
+  addProductionCanopyMassShadows(target);
 
   addProductionCliffWall(productionNorthCliff, target, 1, 0x526048, 2.85, 1.2, 72);
   addProductionCliffWall(productionSouthCliff, target, -1, 0x455443, 2.9, 1.26, 72);
@@ -4759,19 +5259,12 @@ function addProductionStyleTarget(root) {
   addProductionCapstones(productionEastCliff, 10, target, 1, 0x59634f);
 
   addProductionLaneDetails(target);
+  addProductionLaneShoulderBreakup(target);
+  addProductionLaneSlabClusters(target);
   productionBrushZones.forEach(([x, z, rx, rz], index) => {
     addProductionBrushPatch(x, z, rx, rz, 120 + (index % 3) * 24, 18 + (index % 2) * 8, target, index + 1);
   });
-  [
-    [-18.6, 10.0, 4.8, 1.9, 58],
-    [-3.6, 10.2, 6.1, 2.1, 72],
-    [16.6, 9.2, 5.6, 2.1, 68],
-    [-18.2, -13.0, 5.0, 2.1, 62],
-    [2.6, -12.2, 6.0, 2.0, 72],
-    [17.6, -9.4, 5.0, 2.1, 62],
-  ].forEach(([x, z, rx, rz, count], index) => addProductionCanopyStand(x, z, rx, rz, count, target, index + 1));
-  addProductionCanopyHighlights(target);
-  addProductionCanopyBrushCards(target);
+  addProductionSculptedCanopyPlates(target);
   addProductionRootForms(target);
   addProductionObjective(target);
   addProductionRuinedGate(-13.2, -5.8, 0.34, 0x79c9ff, target);
@@ -4779,8 +5272,8 @@ function addProductionStyleTarget(root) {
 }
 
 function addLighting() {
-  scene.add(new THREE.HemisphereLight(0xe6ffe5, 0x263026, 1.12));
-  const sun = new THREE.DirectionalLight(0xffdfaa, 4.9);
+  scene.add(new THREE.HemisphereLight(0xe6ffe5, 0x263026, 0.86));
+  const sun = new THREE.DirectionalLight(0xffdfaa, 3.25);
   sun.position.set(-14, 24, 12);
   sun.castShadow = true;
   sun.shadow.mapSize.set(4096, 4096);
@@ -4792,18 +5285,70 @@ function addLighting() {
   sun.shadow.camera.bottom = -36;
   sun.shadow.bias = -0.00022;
   scene.add(sun);
-  const rim = new THREE.DirectionalLight(0x9ee9ff, 1.35);
+  const rim = new THREE.DirectionalLight(0x9ee9ff, 0.82);
   rim.position.set(18, 12, -18);
   scene.add(rim);
-  const laneFill = new THREE.DirectionalLight(0xfff3bd, 0.9);
+  const laneFill = new THREE.DirectionalLight(0xfff3bd, 0.55);
   laneFill.position.set(12, 8, 18);
   scene.add(laneFill);
+}
+
+function loadAuthoredMapAsset(root) {
+  const loader = new GLTFLoader();
+  loader.load(
+    authoredMapUrl,
+    (gltf) => {
+      const asset = gltf.scene;
+      asset.name = "AuthoredMobaMapChunk_ModelFirst_NoFog";
+      state.assetLoaded = true;
+      state.authoredMeshCount = 0;
+      asset.traverse((object) => {
+        if (!object.isMesh) {
+          return;
+        }
+        state.authoredMeshCount += 1;
+        object.castShadow = !object.name.toLowerCase().includes("terrain");
+        object.receiveShadow = true;
+        object.frustumCulled = true;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => {
+          if (!material) {
+            return;
+          }
+          material.roughness = material.name?.includes("water") ? 0.56 : Math.max(material.roughness ?? 0.82, 0.82);
+          material.metalness = 0;
+          if (material.name?.includes("water")) {
+            material.transparent = true;
+            material.opacity = 0.5;
+            material.depthWrite = false;
+            material.color = new THREE.Color(0x0b6964);
+            material.emissive = new THREE.Color(0x063c3a);
+            material.emissiveIntensity = 0.08;
+          }
+          if (material.name?.includes("glow")) {
+            material.emissiveIntensity = Math.max(material.emissiveIntensity ?? 0, 0.65);
+          }
+          material.needsUpdate = true;
+        });
+      });
+      root.add(asset);
+      applyDetailVisibility();
+      frameMap();
+    },
+    undefined,
+    (error) => {
+      console.error("Authored GLB failed to load; falling back to procedural target.", error);
+      addProductionStyleTarget(root);
+    },
+  );
 }
 
 function buildMap() {
   state.mapRoot.name = "ProductionMobaStyleTarget_NotSummonersRift";
   scene.add(state.mapRoot);
   const productionRoot = state.mapRoot;
+  loadAuthoredMapAsset(productionRoot);
+  return;
   const legacyRoot = new THREE.Group();
   legacyRoot.name = "LegacyProceduralBlockout_Hidden";
   legacyRoot.visible = false;
@@ -4907,9 +5452,9 @@ function buildMap() {
 
 function applyTheme() {
   const themes = {
-    dawn: { bg: 0x243237, exposure: 1.04, bloom: 0.1, grade: 0.78 },
-    rune: { bg: 0x202c34, exposure: 1.0, bloom: 0.18, grade: 0.86 },
-    night: { bg: 0x151d29, exposure: 0.92, bloom: 0.24, grade: 0.68 },
+    dawn: { bg: 0x243237, exposure: 0.84, bloom: 0.07, grade: 0.52 },
+    rune: { bg: 0x202c34, exposure: 0.82, bloom: 0.14, grade: 0.62 },
+    night: { bg: 0x151d29, exposure: 0.76, bloom: 0.2, grade: 0.48 },
   };
   const theme = themes[state.theme] ?? themes.dawn;
   scene.background.setHex(theme.bg);
@@ -4954,6 +5499,16 @@ function applyDetailVisibility() {
       object.name === "ProductionStyleTargetPaintStroke" ||
       object.name === "ProductionStyleTargetBakedOcclusion" ||
       object.name === "ProductionStyleTargetTerrainPaintAccent" ||
+      object.name === "ProductionStyleTargetLaneEmbeddedSlabs" ||
+      object.name === "ProductionStyleTargetLaneSlabShadows" ||
+      object.name === "ProductionStyleTargetLaneShoulderBreakup" ||
+      object.name === "ProductionStyleTargetWaterLilyPads" ||
+      object.name === "ProductionStyleTargetWaterDetailRipples" ||
+      object.name === "ProductionStyleTargetCanopyMassShadow" ||
+      object.name === "ProductionStyleTargetSculptedCanopyPlates" ||
+      object.name === "ProductionStyleTargetSculptedCanopyPlateShadows" ||
+      object.name === "ProductionStyleTargetSculptedCanopyTrunks" ||
+      object.name === "ProductionStyleTargetSculptedCanopyBranches" ||
       object.name === "ProductionStyleTargetOrganicEdgeMatte" ||
       object.name === "ProductionStyleTargetCliffFacePaint" ||
       object.name === "ProductionStyleTargetCapstones" ||
@@ -5031,6 +5586,7 @@ function resize() {
   composer.setSize(innerWidth, innerHeight);
   ssaoPass.setSize(innerWidth, innerHeight);
   bloomPass.setSize(innerWidth, innerHeight);
+  fxaaPass.material.uniforms.resolution.value.set(1 / (innerWidth * renderPixelRatio), 1 / (innerHeight * renderPixelRatio));
   camera.left = (-ORTHO_VIEW_SIZE * aspect) / 2;
   camera.right = (ORTHO_VIEW_SIZE * aspect) / 2;
   camera.top = ORTHO_VIEW_SIZE / 2;
