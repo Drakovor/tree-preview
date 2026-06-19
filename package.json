@@ -1,0 +1,16 @@
+{
+  "name": "true-3d-tree",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "vite": "^7.1.6",
+    "three": "^0.180.0",
+    "lucide": "^0.468.0"
+  },
+  "devDependencies": {}
+}

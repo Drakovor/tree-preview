@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Map MOBA 3D</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene" aria-label="Scene 3D interactive de map MOBA"></canvas>
+      <aside class="toolbar" aria-label="Commandes">
+        <button id="randomize" class="icon-button" type="button" aria-label="Recadrer la camera" title="Recadrer"></button>
+        <button id="toggleLeaves" class="icon-button active" type="button" aria-label="Afficher ou masquer l'objectif" title="Objectif"></button>
+        <div class="divider" aria-hidden="true"></div>
+        <label class="range-control">
+          <span>Eau</span>
+          <input id="wind" type="range" min="0" max="1" value="0.35" step="0.01" />
+        </label>
+        <label class="range-control">
+          <span>Detail</span>
+          <input id="density" type="range" min="0.35" max="1" value="1" step="0.01" />
+        </label>
+        <div class="segmented" role="group" aria-label="Ambiance">
+          <button class="season active" type="button" data-season="dawn">Aube</button>
+          <button class="season" type="button" data-season="rune">Rune</button>
+          <button class="season" type="button" data-season="night">Nuit</button>
+        </div>
+      </aside>
+    </div>
+    <script type="module" src="/src/moba-map.js"></script>
+  </body>
+</html>
