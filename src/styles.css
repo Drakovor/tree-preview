@@ -3,8 +3,8 @@
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  background: #0e1116;
-  color: #f2f5f0;
+  background: #030107;
+  color: #efe8f6;
 }
 
 * {
@@ -22,6 +22,10 @@ body,
 
 body {
   min-width: 320px;
+  background:
+    radial-gradient(circle at 52% 44%, rgb(58 18 92 / 0.28), transparent 34%),
+    radial-gradient(circle at 80% 18%, rgb(255 104 36 / 0.08), transparent 28%),
+    #030107;
 }
 
 #scene {
@@ -30,7 +34,7 @@ body {
   width: 100%;
   height: 100%;
   display: block;
-  background: #0e1116;
+  background: #030107;
   touch-action: none;
 }
 
@@ -44,41 +48,62 @@ body {
   gap: 10px;
   max-width: calc(100vw - 32px);
   padding: 10px;
-  border: 1px solid rgb(255 255 255 / 0.16);
-  border-radius: 8px;
-  background: rgb(13 17 22 / 0.78);
-  box-shadow: 0 16px 36px rgb(0 0 0 / 0.32);
-  backdrop-filter: blur(14px);
-  opacity: 0.74;
+  border: 1px solid rgb(189 119 255 / 0.22);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgb(12 5 18 / 0.84), rgb(4 2 8 / 0.76));
+  box-shadow:
+    0 18px 44px rgb(0 0 0 / 0.48),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+  backdrop-filter: blur(16px);
+  opacity: 0.82;
   transition:
     opacity 160ms ease,
     border-color 160ms ease,
     background 160ms ease;
 }
 
+.toolbar::before {
+  content: "DRAKO LAIR · TRUE 3D";
+  position: absolute;
+  left: 11px;
+  top: -25px;
+  padding: 3px 7px;
+  border: 1px solid rgb(179 84 255 / 0.24);
+  border-radius: 999px;
+  color: rgb(229 205 255 / 0.74);
+  background: rgb(5 2 9 / 0.58);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
 .toolbar:hover,
 .toolbar:focus-within {
   opacity: 1;
+  border-color: rgb(190 112 255 / 0.46);
 }
 
 .icon-button,
 .season {
   height: 38px;
-  border: 1px solid rgb(255 255 255 / 0.14);
-  color: #eef4eb;
-  background: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(212 155 255 / 0.17);
+  color: #f1e7fb;
+  background: rgb(255 255 255 / 0.055);
   cursor: pointer;
   transition:
     border-color 160ms ease,
     background 160ms ease,
-    transform 160ms ease;
+    transform 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .icon-button {
   width: 38px;
   display: inline-grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: 9px;
   padding: 0;
 }
 
@@ -90,8 +115,9 @@ body {
 
 .icon-button:hover,
 .season:hover {
-  border-color: rgb(180 214 161 / 0.76);
-  background: rgb(180 214 161 / 0.14);
+  border-color: rgb(255 122 47 / 0.54);
+  background: rgb(103 16 164 / 0.22);
+  box-shadow: 0 0 18px rgb(103 16 164 / 0.16);
 }
 
 .icon-button:active,
@@ -101,47 +127,55 @@ body {
 
 .icon-button.active,
 .season.active {
-  border-color: rgb(152 202 126 / 0.82);
-  background: rgb(99 143 73 / 0.34);
+  border-color: rgb(184 238 138 / 0.72);
+  background: rgb(103 16 164 / 0.28);
+  box-shadow:
+    0 0 18px rgb(184 238 138 / 0.08),
+    inset 0 0 16px rgb(103 16 164 / 0.16);
 }
 
 .divider {
   width: 1px;
   height: 30px;
-  background: rgb(255 255 255 / 0.14);
+  background: rgb(212 155 255 / 0.16);
 }
 
 .range-control {
   display: grid;
-  grid-template-columns: auto minmax(88px, 132px);
+  grid-template-columns: auto minmax(94px, 138px);
   align-items: center;
   gap: 9px;
-  min-width: 140px;
+  min-width: 148px;
   font-size: 12px;
   line-height: 1;
-  color: rgb(242 245 240 / 0.82);
+  color: rgb(239 232 246 / 0.82);
+}
+
+.range-control span {
+  font-weight: 750;
+  letter-spacing: 0.03em;
 }
 
 .range-control input {
   width: 100%;
-  accent-color: #8fc36a;
+  accent-color: #b354ff;
 }
 
 .segmented {
   display: grid;
-  grid-template-columns: repeat(3, minmax(54px, auto));
+  grid-template-columns: repeat(3, minmax(58px, auto));
   gap: 4px;
   padding: 3px;
-  border-radius: 8px;
-  background: rgb(255 255 255 / 0.06);
+  border-radius: 9px;
+  background: rgb(255 255 255 / 0.055);
 }
 
 .season {
-  min-width: 54px;
+  min-width: 58px;
   padding: 0 10px;
-  border-radius: 6px;
+  border-radius: 7px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 @media (max-width: 720px) {
@@ -150,15 +184,20 @@ body {
     right: auto;
     bottom: max(10px, env(safe-area-inset-bottom));
     left: max(10px, env(safe-area-inset-left));
-    width: min(148px, calc(100vw - 20px));
+    width: min(168px, calc(100vw - 20px));
     display: grid;
-    grid-template-columns: 28px 28px 1fr;
+    grid-template-columns: 30px 30px 1fr;
     align-items: center;
     gap: 6px;
     padding: 7px;
-    background: rgb(13 17 22 / 0.48);
-    transform: scale(0.84);
+    background: rgb(5 2 9 / 0.58);
+    transform: scale(0.86);
     transform-origin: bottom left;
+  }
+
+  .toolbar::before {
+    top: -23px;
+    font-size: 8.5px;
   }
 
   .divider {
@@ -166,8 +205,8 @@ body {
   }
 
   .icon-button {
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
   }
 
   .icon-button svg {
@@ -177,7 +216,7 @@ body {
 
   .range-control {
     grid-column: span 3;
-    grid-template-columns: 36px 1fr;
+    grid-template-columns: 42px 1fr;
     gap: 6px;
     min-width: 0;
     font-size: 10px;
@@ -190,7 +229,7 @@ body {
 
   .season {
     min-width: 0;
-    height: 27px;
+    height: 28px;
     padding: 0 4px;
     font-size: 9.5px;
   }
