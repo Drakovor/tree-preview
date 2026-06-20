@@ -70,6 +70,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "hi
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.9));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.14;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 container.appendChild(renderer.domElement);
@@ -81,10 +83,10 @@ controls.minDistance = 0.8;
 controls.maxDistance = 80;
 controls.enablePan = true;
 
-const hemi = new THREE.HemisphereLight(0xc7d9e4, 0x6e755f, 1.85);
+const hemi = new THREE.HemisphereLight(0xd9e7ea, 0x728066, 2.18);
 scene.add(hemi);
 
-const sun = new THREE.DirectionalLight(0xffe4b8, 3.2);
+const sun = new THREE.DirectionalLight(0xffe6bd, 3.55);
 sun.position.set(-5.5, 8.2, -5.4);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
@@ -96,7 +98,7 @@ sun.shadow.camera.top = 16;
 sun.shadow.camera.bottom = -16;
 scene.add(sun);
 
-const fill = new THREE.DirectionalLight(0x8da7c6, 0.52);
+const fill = new THREE.DirectionalLight(0x9fb9d8, 0.78);
 fill.position.set(6, 4, 6);
 scene.add(fill);
 
@@ -118,8 +120,8 @@ function frameObject(object) {
   const fitDistance = maxDim / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
   const mobile = window.matchMedia("(max-width: 720px), (pointer: coarse)").matches;
   if (currentAsset === "environment" && localViewMode) {
-    target.set(-0.65, 0.72, 0.92);
-    camera.position.set(mobile ? -5.15 : -6.55, mobile ? 2.85 : 3.32, mobile ? 5.15 : 6.65);
+    target.set(mobile ? -1.08 : -0.65, mobile ? 0.58 : 0.72, mobile ? 0.82 : 0.92);
+    camera.position.set(mobile ? -4.45 : -6.55, mobile ? 1.95 : 3.32, mobile ? 4.18 : 6.65);
   } else {
     const direction = mobile
       ? new THREE.Vector3(0.72, 0.52, 0.92).normalize()
@@ -145,11 +147,14 @@ function tuneEnvironmentMaterial(child) {
     child.visible = false;
     return;
   }
-  if (/sculpted_terraced_ground|grass_high|grass_low|meadow/.test(key)) color = 0x3d5539;
-  if (/layered_s_curved_dirt_path|path_dirt|path_dry/.test(key)) color = 0x675846;
-  if (/cut_earth_path_embankment|earth_bank/.test(key)) color = 0x4e4034;
-  if (/stone|cobble|slab|rock/.test(key)) color = 0x686b64;
-  if (/leaf|moss|bush|canopy/.test(key)) color = 0x314f32;
+  if (/dark_wood|wood_dark|root_dark|charred/.test(key)) color = 0x342416;
+  else if (/wood|trunk|branch|rail|fence|post|root|timber|log|plank|beam|sign|door/.test(key)) color = 0x72492d;
+  else if (/roof|slate/.test(key)) color = 0x242b2d;
+  else if (/sculpted_terraced_ground|grass_high|grass_low|meadow/.test(key)) color = 0x526d4b;
+  else if (/layered_s_curved_dirt_path|path_dirt|path_dry/.test(key)) color = 0x755f4d;
+  else if (/cut_earth_path_embankment|earth_bank/.test(key)) color = 0x604b3b;
+  else if (/stone|cobble|slab|rock/.test(key)) color = 0x73766e;
+  else if (/leaf|moss|bush|canopy/.test(key)) color = 0x3c5c37;
   if (!color) return;
   for (const material of materials) {
     if (material.color) material.color.setHex(color);
