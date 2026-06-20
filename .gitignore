@@ -1,6 +1,5 @@
 node_modules/
 dist/
-public/
 external_assets/
 tools/
 .DS_Store
