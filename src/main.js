@@ -16,7 +16,12 @@ const captureMode = params.get("capture") === "1";
 let localViewMode = params.get("view") !== "wide";
 if (captureMode) document.body.classList.add("capture");
 
-const publicUrl = (path) => new URL(path, window.location.href).href;
+const assetVersion = params.get("v") || "local-view";
+const publicUrl = (path) => {
+  const url = new URL(path, window.location.href);
+  url.searchParams.set("v", assetVersion);
+  return url.href;
+};
 const assets = {
   environment: {
     label: "Extérieur sculpté",
