@@ -150,7 +150,10 @@ function tuneEnvironmentMaterial(child) {
   if (/dark_wood|wood_dark|root_dark|charred/.test(key)) color = 0x342416;
   else if (/wood|trunk|branch|rail|fence|post|root|timber|log|plank|beam|sign|door/.test(key)) color = 0x72492d;
   else if (/roof|slate/.test(key)) color = 0x242b2d;
+  else if (/dry_grass|worn_meadow/.test(key)) color = 0x77734a;
+  else if (/cool_grass|shadow_low|shadow_moss|terrain_material.*shadow/.test(key)) color = 0x34513b;
   else if (/sculpted_terraced_ground|grass_high|grass_low|meadow/.test(key)) color = 0x526d4b;
+  else if (/trampled_soil|dead_leaf|path_shoulder/.test(key)) color = 0x6a5135;
   else if (/layered_s_curved_dirt_path|path_dirt|path_dry/.test(key)) color = 0x755f4d;
   else if (/cut_earth_path_embankment|earth_bank/.test(key)) color = 0x604b3b;
   else if (/stone|cobble|slab|rock/.test(key)) color = 0x73766e;
