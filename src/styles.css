@@ -90,6 +90,11 @@ button:hover {
   background: rgb(14 18 20 / 0.9);
 }
 
+button:disabled {
+  opacity: 0.46;
+  cursor: default;
+}
+
 #loading {
   inset: 0;
   display: grid;

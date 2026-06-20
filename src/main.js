@@ -7,11 +7,13 @@ const container = document.querySelector("#app");
 const loading = document.querySelector("#loading");
 const hudLabel = document.querySelector("#hud-label");
 const assetButton = document.querySelector("#asset-mode");
+const viewButton = document.querySelector("#view-mode");
 const resetButton = document.querySelector("#reset");
 const wireButton = document.querySelector("#wire");
 
 const params = new URLSearchParams(window.location.search);
 const captureMode = params.get("capture") === "1";
+let localViewMode = params.get("view") !== "wide";
 if (captureMode) document.body.classList.add("capture");
 
 const publicUrl = (path) => new URL(path, window.location.href).href;
@@ -97,6 +99,8 @@ function applyAssetUi() {
   const asset = assets[currentAsset];
   hudLabel.textContent = asset.label;
   assetButton.textContent = asset.nextLabel;
+  viewButton.textContent = localViewMode ? "Vue large" : "Vue locale";
+  viewButton.disabled = currentAsset !== "environment";
 }
 
 function frameObject(object) {
@@ -108,16 +112,45 @@ function frameObject(object) {
   target.y += size.y * 0.04;
   const fitDistance = maxDim / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
   const mobile = window.matchMedia("(max-width: 720px), (pointer: coarse)").matches;
-  const direction = mobile
-    ? new THREE.Vector3(0.72, 0.52, 0.92).normalize()
-    : new THREE.Vector3(0.7, 0.46, 0.78).normalize();
-  const distance = fitDistance * assets[currentAsset].distance * (mobile ? 1.16 : 1.0);
-  camera.position.copy(target).add(direction.multiplyScalar(distance));
+  if (currentAsset === "environment" && localViewMode) {
+    target.set(-0.65, 0.72, 0.92);
+    camera.position.set(mobile ? -5.15 : -6.55, mobile ? 2.85 : 3.32, mobile ? 5.15 : 6.65);
+  } else {
+    const direction = mobile
+      ? new THREE.Vector3(0.72, 0.52, 0.92).normalize()
+      : new THREE.Vector3(0.7, 0.46, 0.78).normalize();
+    const distance = fitDistance * assets[currentAsset].distance * (mobile ? 1.16 : 1.0);
+    camera.position.copy(target).add(direction.multiplyScalar(distance));
+  }
   camera.near = Math.max(0.01, fitDistance / 120);
   camera.far = Math.max(90, fitDistance * 90);
   camera.updateProjectionMatrix();
   controls.target.copy(target);
+  controls.minDistance = Math.max(0.35, maxDim * 0.08);
+  controls.maxDistance = Math.max(24, maxDim * 3.2);
   controls.update();
+}
+
+function tuneEnvironmentMaterial(child) {
+  if (currentAsset !== "environment" || !child.isMesh || !child.material) return;
+  const materials = Array.isArray(child.material) ? child.material : [child.material];
+  const key = `${child.name} ${materials.map((material) => material.name || "").join(" ")}`.toLowerCase();
+  let color = null;
+  if (/organic_blended_edge_ribbon/.test(key)) {
+    child.visible = false;
+    return;
+  }
+  if (/sculpted_terraced_ground|grass_high|grass_low|meadow/.test(key)) color = 0x3d5539;
+  if (/layered_s_curved_dirt_path|path_dirt|path_dry/.test(key)) color = 0x675846;
+  if (/cut_earth_path_embankment|earth_bank/.test(key)) color = 0x4e4034;
+  if (/stone|cobble|slab|rock/.test(key)) color = 0x686b64;
+  if (/leaf|moss|bush|canopy/.test(key)) color = 0x314f32;
+  if (!color) return;
+  for (const material of materials) {
+    if (material.color) material.color.setHex(color);
+    material.roughness = Math.min(1, material.roughness ?? 0.9);
+    material.needsUpdate = true;
+  }
 }
 
 function loadAsset() {
@@ -149,6 +182,7 @@ function loadAsset() {
         if (!child.isMesh) return;
         child.castShadow = true;
         child.receiveShadow = true;
+        tuneEnvironmentMaterial(child);
         if (child.material) {
           const materials = Array.isArray(child.material) ? child.material : [child.material];
           for (const material of materials) {
@@ -190,6 +224,18 @@ assetButton.addEventListener("click", () => {
   next.searchParams.set("v", String(Date.now()));
   window.history.replaceState(null, "", next);
   loadAsset();
+});
+
+viewButton.addEventListener("click", () => {
+  if (currentAsset !== "environment") return;
+  localViewMode = !localViewMode;
+  const next = new URL(window.location.href);
+  if (localViewMode) next.searchParams.delete("view");
+  else next.searchParams.set("view", "wide");
+  next.searchParams.set("v", String(Date.now()));
+  window.history.replaceState(null, "", next);
+  applyAssetUi();
+  if (model) frameObject(model);
 });
 
 wireButton.addEventListener("click", () => {
